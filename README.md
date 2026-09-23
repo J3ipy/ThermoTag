@@ -1,32 +1,104 @@
-# ThermoTag SE — MVP
+# ThermoTag SE
 
-Protótipo para rastrear cargas sensíveis à temperatura em Sergipe. Contém cadastro de carga, gravação e leitura NFC no Chrome para Android, abertura de URL NFC no iPhone, check-in por código manual, geolocalização opcional, painel de ocorrências e passaporte digital. Os dados são persistidos em Cloudflare D1.
+MVP de rastreabilidade de cargas sensíveis à temperatura. Cada carga recebe um código de etiqueta e uma URL que pode ser gravada em uma tag NFC. Ao abrir essa URL, o operador identifica a carga, confere visualmente o indicador térmico e registra um check-in com etapa, local, responsável e horário.
 
-## Demonstração
+**Aplicação:** https://thermotag-se.thermotag.workers.dev/
 
-1. Clique em **Carregar demonstração**. O cenário simulado cria duas cargas: `SE-02931` (Estância → Aracaju, com alerta entre Itaporanga d'Ajuda e São Cristóvão) e `SE-02932` (Lagarto → Aracaju, em trânsito).
-2. Abra **Passaportes** para mostrar o intervalo entre o último check-in normal e o primeiro alerta.
-3. Abra **Registrar leitura** e escolha `TT-SE-02932` para fazer um novo check-in da carga em trânsito. Use a condição visual desejada e um nome de operador de demonstração.
-4. Para cadastrar uma carga própria, clique em **Nova carga** e informe o código da etiqueta, o produto, a origem, o destino e o limiar do indicador físico. No passaporte, use **Gravar com Android** para escrever a URL na tag ou **Copiar URL** para usar um aplicativo de gravação NFC no iPhone. Depois aproxime a tag para abrir o check-in.
+> A tag NFC identifica a carga; ela não mede temperatura. O estado térmico é informado pelo operador após inspeção visual de um indicador físico. O projeto é um protótipo para validação, não um sistema de medição contínua.
 
-Os registros simulados são identificados como demonstração. O botão é idempotente; não cria cópias a cada clique.
+## Funcionalidades
 
-## Etiqueta NFC
+- Cadastro de cargas com produto, origem, destino, código da etiqueta e limiar do indicador.
+- Check-ins de expedição, checkpoint e recebimento, com horário registrado no servidor.
+- Condição visual **íntegra** ou **indicador ativado**; um alerta registrado não pode voltar ao estado normal.
+- GPS opcional com permissão do dispositivo; preenchimento manual de localidade como alternativa.
+- Passaporte digital com histórico de leituras, alerta e intervalo entre o último registro normal e o primeiro alerta.
+- Painel com cargas, leituras, ocorrências e mapa esquemático.
+- Dados de demonstração identificados como simulados.
 
-Compre uma tag NFC gravável compatível com NDEF. O fluxo foi pensado para uma NTAG213 ou NTAG215. Depois de cadastrar a carga, o sistema prepara uma URL HTTPS com o código público da etiqueta, como `https://.../?tag=TT-SE-0001`. Não grave nome do operador, localização, status térmico ou informações sensíveis na tag: os registros ficam no banco de dados.
+## Como funciona a etiqueta NFC
 
-No Android com Chrome e NFC ativado, **Gravar com Android** escreve essa URL como registro NDEF do tipo URL na tag aproximada. A gravação substitui o conteúdo anterior da tag; não a torne somente leitura durante o piloto. O botão **Escanear etiqueta NFC** também lê registros NDEF de URL ou texto, e o código impresso é a alternativa manual.
+1. Cadastre uma carga em **Nova carga** e defina o código da etiqueta, por exemplo, `TT-SE-001`.
+2. Em **Passaportes**, selecione a carga e copie ou grave a URL gerada: `https://thermotag-se.thermotag.workers.dev/?tag=TT-SE-001`.
+3. Grave essa URL em uma **tag NFC NDEF gravável**, como um registro do tipo **URL**. A tag não precisa vir programada; o sistema gera o link após o cadastro, mas a gravação exige um celular ou aplicativo compatível.
+4. Aproxime a tag do celular. O link abre o formulário com o código da carga preenchido.
+5. Confira o indicador físico, preencha os dados e confirme o check-in. **A aproximação da tag não salva um registro automaticamente.**
 
-No iPhone, o navegador não oferece Web NFC para o botão de leitura/gravação. Para o teste, use **Copiar URL** e grave a tag como registro NDEF URL por um aplicativo gravador NFC. Ao aproximar um iPhone compatível da tag com a tela ativa, o sistema pode apresentar a URL para abrir no Safari; a página reconhece `?tag=...` e prepara o formulário de check-in. O usuário precisa ter acesso ao Site privado. O check-in exige confirmação visual do indicador e envio explícito; aproximar a tag por si só não registra nada.
+| Dispositivo | Leitura | Gravação |
+| --- | --- | --- |
+| Android com Chrome e NFC | Botão **Escanear etiqueta NFC** com Web NFC ou abertura da URL gravada | Botão **Gravar com Android** |
+| iPhone compatível | Aproximar a tag com a tela acesa e tocar na notificação que abre a URL no Safari | Copiar a URL e usar um aplicativo de gravação NFC |
 
-O operador informa **íntegro** ou **ativado**. O app impede que um alerta volte ao estado normal em check-ins posteriores, porque a mudança física proposta é irreversível. Hora é registrada no servidor. O GPS depende da permissão do usuário; sem ela, o local informado permanece identificado como manual. Para cidades conhecidas, o mapa usa o centro aproximado da cidade informada. A linha liga check-ins, não representa a rota real percorrida.
+O Safari no iPhone não disponibiliza o leitor Web NFC dentro da página. A leitura da URL gravada na tag é feita pelo próprio iOS em aparelhos compatíveis, em geral iPhone XS ou posterior. Também é possível digitar o código da etiqueta manualmente. Use tags NDEF graváveis; durante os testes, não bloqueie a tag para gravação.
 
-## Limite do protótipo
+O código e o link da carga ficam na tag. Histórico, status, horário e localização ficam no banco D1. A etiqueta NFC e o indicador físico de temperatura são componentes diferentes.
 
-A aplicação está funcional, mas a integração de uma etiqueta termocrômica irreversível ainda depende da seleção, calibração e teste físico de um indicador apropriado à faixa térmica de cada produto. O sistema não substitui sensor contínuo, data logger, laudo de temperatura ou uma política de descarte. Não atribui culpa com base apenas no intervalo entre check-ins.
+## Demonstração rápida
 
-A versão publicada é privada. Para um piloto com vários operadores, é necessário definir o acesso de cada pessoa e validar os procedimentos de recebimento e auditoria.
+Na aplicação, clique em **Carregar demonstração** para criar duas cargas fictícias. A primeira inclui uma ocorrência de alerta; a segunda permanece em trânsito. Abra **Passaportes** para consultar o histórico ou **Registrar leitura** para fazer um novo check-in de teste. Clicar novamente em **Carregar demonstração** não duplica essas cargas.
 
-## Desenvolvimento local
+## Tecnologias
 
-Requer Node.js 22+. Instale as dependências com `npm install`, gere a migração com `npm run db:generate`, construa com `npm run build`, aplique o SQL de `drizzle/` ao D1 local e inicie com `npm run dev`. A configuração da instância hospedada fica em `.openai/hosting.json`.
+- **Interface:** TypeScript, React, componentes Base UI e CSS.
+- **Aplicação web:** Vinext, Vite e Cloudflare Workers.
+- **Persistência:** Cloudflare D1 (SQLite); esquema em `db/schema.ts` e SQL inicial em `drizzle/0000_quick_harrier.sql`.
+- **NFC:** Web NFC quando disponível no navegador; URL NDEF para abertura pelo sistema do celular.
+
+O projeto usa o vínculo D1 chamado `DB`, referenciado no código do servidor. As rotas principais são `GET /api/shipments`, `POST /api/shipments`, `POST /api/checkins` e `POST /api/demo`.
+
+## Executar localmente
+
+Requisitos: **Node.js 22.13.0 ou superior** e Corepack. O `package.json` fixa o pnpm na versão `11.25.0`. No terminal da pasta do projeto:
+
+```powershell
+corepack pnpm install
+corepack pnpm build
+corepack pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.json --file drizzle/0000_quick_harrier.sql
+corepack pnpm dev
+```
+
+Abra o endereço exibido pelo terminal (normalmente `http://localhost:5173`). A importação do SQL é necessária **uma vez por banco local**. Os dados locais ficam em `.wrangler/state` e são separados dos dados publicados.
+
+No Windows, se `corepack enable` falhar por falta de permissão em `C:\Program Files\nodejs`, use `corepack pnpm` diretamente, como nos comandos acima. Para executar o build com o servidor local do Wrangler, use `corepack pnpm start` depois de aplicar o SQL.
+
+## Publicar na própria conta Cloudflare
+
+O projeto precisa de um Worker e de um banco D1; uma hospedagem apenas de arquivos estáticos não executa as rotas da API.
+
+1. Entre na sua conta e crie o banco:
+
+   ```powershell
+   corepack pnpm exec wrangler login
+   corepack pnpm exec wrangler d1 create thermotag-se-db
+   ```
+
+2. Em `vite.config.ts`, no objeto `d1_databases`, configure `database_name: "thermotag-se-db"` e substitua `database_id` pelo ID retornado. **Mantenha `binding: d1`**, pois `.openai/hosting.json` define `d1` como `DB`.
+3. Gere a aplicação, crie as tabelas no banco remoto e publique:
+
+   ```powershell
+   corepack pnpm build
+   corepack pnpm exec wrangler d1 execute thermotag-se-db --remote --config dist/server/wrangler.json --file drizzle/0000_quick_harrier.sql
+   corepack pnpm exec wrangler deploy --config dist/server/wrangler.json --name thermotag-se
+   ```
+
+A importação do SQL remoto é feita **somente na primeira publicação desse banco**. Nas publicações seguintes, execute o build e o deploy. O Wrangler informa a URL `*.workers.dev`; novas tags devem usar a URL dessa implantação.
+
+## Estado e limites do MVP
+
+- A versão publicada **não tem autenticação própria** nas rotas da API. Qualquer pessoa com acesso à URL pode consultar cargas e enviar novos registros. Use apenas dados fictícios até adicionar controle de acesso.
+- O GPS depende das permissões do navegador. Sem GPS, o operador pode informar a localidade; o mapa usa o centro aproximado de cidades conhecidas. As linhas no mapa não representam a rota real percorrida.
+- O indicador térmico físico ainda precisa ser selecionado e validado para cada faixa de temperatura. O software não lê a temperatura da tag e não substitui um sensor ou data logger.
+- Leituras no iPhone abrem um link gravado na tag. Um leitor NFC iniciado por botão dentro do Safari exigiria uma capacidade que o navegador não oferece.
+
+## Estrutura principal
+
+| Caminho | Conteúdo |
+| --- | --- |
+| `app/page.tsx` | Interface, fluxo de NFC e check-in |
+| `app/api/` | Rotas HTTP |
+| `app/globals.css` | Estilos da interface |
+| `lib/` | Modelo e acesso ao D1 |
+| `db/` e `drizzle/` | Esquema e SQL inicial |
+| `vite.config.ts` | Configuração do Worker e do vínculo D1 |
+
+Projeto desenvolvido como MVP do **Inovathon SE**.
