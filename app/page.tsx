@@ -1,0 +1,203 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Activity, ArrowRight, Check, ChevronRight, CircleAlert, Clock3, Compass, MapPin, Package, Plus, Radio, ScanLine, ShieldCheck, Smartphone, Thermometer, Truck, X } from "lucide-react";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
+import { Button } from "@/components/ui/button";
+import type { Shipment, Checkin } from "@/lib/model";
+import { places } from "@/lib/model";
+
+const dateTime = (value: string) => new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date(value));
+const timeOnly = (value: string) => new Intl.DateTimeFormat("pt-BR", { hour: "2-digit", minute: "2-digit", timeZone: "America/Sao_Paulo" }).format(new Date(value));
+const latest = (s: Shipment) => s.checkins.at(-1);
+const isAlert = (s: Shipment) => latest(s)?.status === "alert";
+const isDelivered = (s: Shipment) => latest(s)?.stage === "Recebimento";
+
+async function post(path: string, body?: object) {
+  const response = await fetch(path, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body || {}) });
+  const data = await response.json() as { error?: string; id?: string };
+  if (!response.ok) throw new Error(data.error || "Falha ao salvar os dados.");
+  return data;
+}
+
+function Brand() {
+  return <div className="brand"><span className="brand-mark"><Thermometer size={23} strokeWidth={2.5} /></span><span>THERMO<span className="brand-accent">TAG</span><small>SE</small></span></div>;
+}
+
+function Status({ alert, delivered }: { alert?: boolean; delivered?: boolean }) {
+  return <span className={`status ${alert ? "status-alert" : delivered ? "status-done" : "status-ok"}`}><i />{alert ? "Alerta térmico" : delivered ? "Entregue" : "Em trânsito"}</span>;
+}
+
+function RouteMap({ shipment }: { shipment: Shipment | undefined }) {
+  const points = (shipment?.checkins || []).filter((p) => p.latitude !== null && p.longitude !== null);
+  const x = (lon: number) => 55 + ((lon + 37.73) / 0.78) * 570;
+  const y = (lat: number) => 330 - ((lat + 11.42) / 0.72) * 270;
+  const polyline = points.map(p => `${x(p.longitude!)},${y(p.latitude!)}`).join(" ");
+  return <div className="map-canvas" role="img" aria-label={points.length ? `Mapa esquemático de ${points.length} registros geográficos da carga ${shipment?.id}` : "Mapa esquemático sem registros geográficos"}>
+    <div className="map-top"><span><Compass size={15} /> Sergipe · pontos registrados</span><span className="map-scale">Visão geográfica simplificada</span></div>
+    <svg viewBox="0 0 700 390" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
+      <defs><pattern id="mapGrid" width="46" height="46" patternUnits="userSpaceOnUse"><path d="M 46 0 L 0 0 0 46" fill="none" stroke="#264651" strokeWidth="1" opacity=".33" /></pattern><linearGradient id="sea"><stop stopColor="#12333b"/><stop offset="1" stopColor="#0c2831"/></linearGradient></defs>
+      <rect width="700" height="390" fill="url(#sea)"/><rect width="700" height="390" fill="url(#mapGrid)"/>
+      <path d="M580 0 C550 90 630 140 600 213 C565 291 625 360 595 390 L700 390 L700 0Z" fill="#17404b" opacity=".75" />
+      <path d="M580 0 C550 90 630 140 600 213 C565 291 625 360 595 390" fill="none" stroke="#3e777e" strokeWidth="2" opacity=".7" />
+      <text x="632" y="190" fill="#6aa0a4" fontSize="12" transform="rotate(90 632 190)">OCEANO ATLÂNTICO</text>
+      <text x="48" y="365" fill="#65858c" fontSize="11" letterSpacing="2">37° O</text><text x="480" y="365" fill="#65858c" fontSize="11" letterSpacing="2">11° S</text>
+      {points.length > 1 && <polyline points={polyline} fill="none" stroke="#79d0bb" strokeWidth="3" strokeDasharray="8 7" strokeLinecap="round" />}
+      {points.map((p, i) => <g key={p.id}><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="15" fill={p.status === "alert" ? "#e77a60" : "#4ac3a8"} opacity=".18" /><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="7" fill={p.status === "alert" ? "#f28c74" : "#66d9bb"} stroke="#0b252c" strokeWidth="2" /><text x={x(p.longitude!) + 13} y={y(p.latitude!) - (i % 2 ? 10 : -23)} fill="#edf9f5" fontSize="12" fontWeight="600" paintOrder="stroke" stroke="#0b252c" strokeWidth="4">{p.place}</text></g>)}
+    </svg>
+    <div className="map-legend"><span><i className="legend-dot" /> Indicador íntegro</span><span><i className="legend-dot red" /> Indicador ativado</span></div>
+  </div>;
+}
+
+function Passport({ shipment, tagLink, onWriteTag, onCopyLink, tagWriteStatus }: { shipment: Shipment; tagLink: string; onWriteTag: () => void; onCopyLink: () => void; tagWriteStatus: string }) {
+  const firstAlert = shipment.checkins.findIndex(p => p.status === "alert");
+  const previous = firstAlert > 0 ? shipment.checkins[firstAlert - 1] : null;
+  const first = firstAlert >= 0 ? shipment.checkins[firstAlert] : null;
+  return <div className="passport">
+    <div className="passport-header"><div><p className="eyebrow">PASSAPORTE DIGITAL</p><h2>{shipment.id} {shipment.demo ? <span className="demo-chip">DEMONSTRAÇÃO</span> : null}</h2><p>{shipment.product} · limiar da etiqueta: {shipment.threshold} °C</p></div><Status alert={isAlert(shipment)} delivered={isDelivered(shipment)} /></div>
+    <div className="passport-route"><div><span>ORIGEM</span><strong>{shipment.origin}</strong></div><ArrowRight size={20}/><div><span>DESTINO</span><strong>{shipment.destination}</strong></div></div>
+    <div className="tag-provision"><div><p className="eyebrow">ETIQUETA NFC</p><strong>{shipment.tagId}</strong><p>Grave esta URL na tag para abrir o check-in por aproximação, inclusive no iPhone.</p></div><input aria-label="URL para gravar na etiqueta NFC" value={tagLink} readOnly onFocus={e => e.currentTarget.select()} /><div className="tag-actions"><button className="button-main" onClick={onWriteTag} disabled={!tagLink}><Radio size={16}/> Gravar com Android</button><button className="button-outline" onClick={onCopyLink} disabled={!tagLink}>Copiar URL</button></div><small>Use uma tag NDEF gravável. A gravação substitui o conteúdo anterior; não bloqueie a tag durante os testes.</small>{tagWriteStatus && <p className="tag-write-status" role="status">{tagWriteStatus}</p>}</div>
+    {first && <div className="finding"><CircleAlert size={19} /><div><strong>Possível exposição térmica identificada</strong><p>{previous ? `Entre o último registro normal em ${previous.place} e o primeiro alerta em ${first.place}.` : `Detectada no primeiro registro em ${first.place}; não há trecho anterior para delimitar.`} A leitura delimita um intervalo, não informa a temperatura nem o momento exato.</p></div></div>}
+    <div className="timeline-heading"><h3>Histórico de leituras</h3><span>{shipment.checkins.length} registro{shipment.checkins.length === 1 ? "" : "s"}</span></div>
+    {shipment.checkins.length ? <ol className="timeline">{shipment.checkins.map((event, index) => <li key={event.id} className={event.status === "alert" ? "timeline-alert" : ""}><span className="timeline-node">{event.status === "alert" ? <CircleAlert size={16}/> : <Check size={15}/>}</span><div className="timeline-content"><div><strong>{event.stage} · {event.place}</strong><time>{dateTime(event.recordedAt)}</time></div><p>{event.status === "alert" ? "Indicador ativado" : "Indicador íntegro"} · {event.actor}</p><small>{event.locationSource === "device" ? "Localização do dispositivo" : "Local informado no check-in"}{event.demo ? " · dado simulado" : ""}</small></div>{index < shipment.checkins.length - 1 && <span className="timeline-line" />}</li>)}</ol> : <div className="empty-small"><Clock3 size={21}/> Aguardando a primeira leitura desta etiqueta.</div>}
+    <p className="passport-note"><ShieldCheck size={15}/> O status térmico é uma confirmação visual do operador; o NFC identifica a etiqueta, não mede a temperatura.</p>
+  </div>;
+}
+
+type NDEFRecordLike = { recordType: string; data: DataView; encoding?: string };
+type NDEFReaderLike = { scan: (options?: { signal?: AbortSignal }) => Promise<void>; write: (message: {records: {recordType: "url"; data: string}[]}) => Promise<void>; onreading: ((event: { serialNumber: string; message: { records: NDEFRecordLike[] } }) => void) | null; onreadingerror: (() => void) | null };
+
+export default function Home() {
+  const [shipments, setShipments] = useState<Shipment[]>([]);
+  const [selectedId, setSelectedId] = useState("");
+  const [tab, setTab] = useState("painel");
+  const [busy, setBusy] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
+  const [dialogOpen, setDialogOpen] = useState(false);
+  const [newLoad, setNewLoad] = useState({ tagId: "", product: "", origin: "Estância", destination: "Aracaju", threshold: "8" });
+  const [form, setForm] = useState({ tagId: "", stage: "Checkpoint", place: "São Cristóvão", actor: "", status: "normal" as "normal" | "alert" });
+  const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
+  const [geoMessage, setGeoMessage] = useState("Localização não capturada; o local informado será registrado.");
+  const [scanStatus, setScanStatus] = useState("");
+  const [tagWriteStatus, setTagWriteStatus] = useState("");
+  const [origin, setOrigin] = useState("");
+  const handledLink = useRef(false);
+
+  const refresh = useCallback(async () => {
+    try {
+      const response = await fetch("/api/shipments", { cache: "no-store" });
+      const data = await response.json() as { error?: string; shipments: Shipment[] };
+      if (!response.ok) throw new Error(data.error || "Dados indisponíveis.");
+      setShipments(data.shipments);
+      setSelectedId(current => current || data.shipments[0]?.id || "");
+      setError("");
+    } catch (e) { setError((e as Error).message); }
+    finally { setLoading(false); }
+  }, []);
+  useEffect(() => { void refresh(); }, [refresh]);
+  useEffect(() => { setOrigin(window.location.origin); }, []);
+  useEffect(() => {
+    if (loading || handledLink.current) return;
+    handledLink.current = true;
+    const code = new URLSearchParams(window.location.search).get("tag")?.trim().toUpperCase();
+    if (!code || !/^[A-Z0-9-]{3,50}$/.test(code)) return;
+    const matched = shipments.find(s => s.tagId === code);
+    setForm(f => ({ ...f, tagId: code, stage: matched?.checkins.length ? "Checkpoint" : "Expedição", place: matched?.checkins.length ? f.place : (matched?.origin || f.place) }));
+    setTab("leitura");
+    setScanStatus(matched ? `Etiqueta ${code} identificada. Confira o indicador físico e registre.` : `Etiqueta ${code} não cadastrada. Cadastre a carga antes do check-in.`);
+    if (matched) setSelectedId(matched.id);
+  }, [loading, shipments]);
+
+  const selected = shipments.find(s => s.id === selectedId) || shipments[0];
+  const tagLink = selected && origin ? `${origin}/?tag=${encodeURIComponent(selected.tagId)}` : "";
+  const active = shipments.filter(s => !isDelivered(s)).length;
+  const alerts = shipments.filter(isAlert).length;
+  const readings = shipments.reduce((sum, s) => sum + s.checkins.length, 0);
+  const feed = useMemo(() => shipments.flatMap(s => s.checkins.map(event => ({ ...event, loadId: s.id, demoLoad: s.demo }))).sort((a,b) => b.recordedAt.localeCompare(a.recordedAt)).slice(0,6), [shipments]);
+
+  const submit = async (path: string, body: object, after?: (data: {id?:string}) => void) => {
+    setBusy(true); setError(""); setNotice("");
+    try { const data = await post(path, body); await refresh(); after?.(data); }
+    catch (e) { setError((e as Error).message); }
+    finally { setBusy(false); }
+  };
+
+  const loadDemo = () => void submit("/api/demo", {}, data => { setSelectedId(data.id || "SE-02931"); setNotice("Percurso simulado carregado. Os registros estão identificados como demonstração."); });
+  const createLoad = (e: React.FormEvent) => { e.preventDefault(); void submit("/api/shipments", { ...newLoad, threshold: Number(newLoad.threshold) }, data => { setSelectedId(data.id || ""); setForm(f => ({ ...f, tagId: newLoad.tagId.toUpperCase(), stage: "Expedição", place: newLoad.origin })); setDialogOpen(false); setTab("cargas"); setNotice("Carga cadastrada. Grave a URL na tag e depois registre a primeira leitura."); }); };
+  const saveReading = (e: React.FormEvent) => { e.preventDefault(); void submit("/api/checkins", { ...form, ...location }, () => { setTab("cargas"); const found = shipments.find(s => s.tagId === form.tagId.toUpperCase()); if (found) setSelectedId(found.id); setNotice("Check-in registrado com horário do servidor."); setLocation(null); }); };
+  const getLocation = () => {
+    if (!navigator.geolocation) { setGeoMessage("Este navegador não oferece geolocalização. Informe o local."); return; }
+    setGeoMessage("Obtendo localização...");
+    navigator.geolocation.getCurrentPosition(p => { setLocation({ latitude: p.coords.latitude, longitude: p.coords.longitude }); setGeoMessage(`GPS capturado · ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`); }, () => { setLocation(null); setGeoMessage("Acesso à localização negado ou indisponível. Informe o local."); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+  };
+  const scanNfc = async () => {
+    const Reader = (window as unknown as { NDEFReader?: new () => NDEFReaderLike }).NDEFReader;
+    if (!Reader) { setScanStatus("O botão de leitura NFC requer Chrome no Android. No iPhone, aproxime a tag gravada com URL para abrir esta página; ou digite o código."); return; }
+    try {
+      const reader = new Reader();
+      const abort = new AbortController();
+      setScanStatus("Aproxime a etiqueta NFC do celular...");
+      await reader.scan({ signal: abort.signal });
+      reader.onreadingerror = () => setScanStatus("Não foi possível ler a etiqueta. Tente novamente ou digite o código.");
+      reader.onreading = event => {
+        let code = "";
+        for (const record of event.message.records) {
+          if (record.recordType === "text" || record.recordType === "url") {
+            const value = new TextDecoder(record.encoding || "utf-8").decode(record.data);
+            const match = value.toUpperCase().match(/TT-[A-Z0-9-]+/);
+            if (match) { code = match[0]; break; }
+          }
+        }
+        code ||= event.serialNumber?.toUpperCase().replace(/[^A-Z0-9-]/g, "") || "";
+        setForm(f => ({ ...f, tagId: code }));
+        setScanStatus(code ? `Etiqueta lida: ${code}. Confirme o indicador visual e registre.` : "Etiqueta detectada sem código. Digite o código impresso.");
+        abort.abort();
+      };
+    } catch { setScanStatus("Leitura NFC cancelada ou indisponível. Digite o código da etiqueta."); }
+  };
+  const writeTag = async () => {
+    const Reader = (window as unknown as { NDEFReader?: new () => NDEFReaderLike }).NDEFReader;
+    if (!Reader) { setTagWriteStatus("Gravação pelo site requer Chrome no Android. Copie a URL e use um aplicativo gravador de tags NDEF no iPhone."); return; }
+    if (!tagLink) return;
+    setTagWriteStatus("Aproxime a tag NFC gravável do Android para escrever a URL...");
+    try { await new Reader().write({ records: [{ recordType: "url", data: tagLink }] }); setTagWriteStatus("URL gravada. Afaste o celular e aproxime novamente a tag para conferir a leitura."); }
+    catch { setTagWriteStatus("Não foi possível gravar. Confira se NFC está ativo e se a tag aceita gravação NDEF."); }
+  };
+  const copyTagLink = async () => {
+    try { await navigator.clipboard.writeText(tagLink); setTagWriteStatus("URL copiada. Grave-a na tag como registro NDEF do tipo URL."); }
+    catch { setTagWriteStatus("Selecione e copie a URL no campo acima para gravá-la como registro NDEF do tipo URL."); }
+  };
+
+  return <div className="app-shell">
+    <aside className="sidebar"><Brand/><p className="sidebar-kicker">CENTRAL LOGÍSTICA</p><nav aria-label="Navegação principal"><button className={tab === "painel" ? "nav-item selected" : "nav-item"} onClick={() => setTab("painel")}><Activity size={19}/> Visão geral</button><button className={tab === "leitura" ? "nav-item selected" : "nav-item"} onClick={() => setTab("leitura")}><ScanLine size={19}/> Registrar leitura</button><button className={tab === "cargas" ? "nav-item selected" : "nav-item"} onClick={() => setTab("cargas")}><Package size={19}/> Passaportes</button></nav><div className="sidebar-bottom"><span className="signal"><i/> Sistema operacional</span><p>Protótipo de rastreabilidade<br/>da cadeia de frio · Sergipe</p></div></aside>
+    <main className="main"><header className="topbar"><div className="mobile-brand"><Brand/></div><div className="topbar-context"><span className="live-dot"/> CENTRAL DE OPERAÇÕES <span className="topbar-separator">/</span> SERGIPE</div><div className="topbar-right"><span className="topbar-date">{new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "long", year: "numeric", timeZone: "America/Sao_Paulo" }).format(new Date())}</span><span className="avatar">SE</span></div></header>
+      <div className="content">
+        {error && <div className="feedback error" role="alert"><CircleAlert size={17}/>{error}<button onClick={() => setError("")} aria-label="Fechar aviso"><X size={16}/></button></div>}
+        {notice && <div className="feedback success" role="status"><Check size={17}/>{notice}<button onClick={() => setNotice("")} aria-label="Fechar aviso"><X size={16}/></button></div>}
+        <Tabs value={tab} onValueChange={setTab}><TabsList className="mobile-tabs"><TabsTrigger value="painel">Painel</TabsTrigger><TabsTrigger value="leitura">Leitura</TabsTrigger><TabsTrigger value="cargas">Cargas</TabsTrigger></TabsList>
+          <TabsContent value="painel"><div className="page-heading"><div><p className="eyebrow">PAINEL DE MONITORAMENTO</p><h1>Visão geral da operação</h1><p>Acompanhe cargas, leituras e ocorrências na cadeia de frio.</p></div><button className="button-main" onClick={() => setTab("leitura")}><ScanLine size={18}/> Nova leitura</button></div>
+            {loading ? <div className="loading">Carregando cargas...</div> : shipments.length === 0 ? <div className="empty-state"><div className="empty-icon"><Radio size={30}/></div><h2>Pronto para monitorar a primeira carga</h2><p>Cadastre uma etiqueta ou carregue o percurso simulado para conhecer o painel.</p><div className="empty-actions"><NewLoadDialog open={dialogOpen} setOpen={setDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy}/><button className="button-outline" onClick={loadDemo} disabled={busy}>Carregar demonstração</button></div></div> : <>
+              <div className="metrics"><Metric icon={<Package size={20}/>} label="Cargas cadastradas" value={shipments.length} detail={`${active} em andamento`}/><Metric icon={<ScanLine size={20}/>} label="Leituras registradas" value={readings} detail="Em todas as etapas"/><Metric icon={<CircleAlert size={20}/>} label="Cargas com alerta" value={alerts} detail="Indicador ativado" warn/></div>
+              <div className="dashboard-grid"><section className="panel map-panel"><div className="panel-header"><div><p className="eyebrow">INTELIGÊNCIA TERRITORIAL</p><h2>Trajeto da carga</h2></div><select aria-label="Selecionar carga no mapa" value={selected?.id || ""} onChange={e => setSelectedId(e.target.value)}>{shipments.map(s => <option value={s.id} key={s.id}>{s.id}{s.demo ? " · demo" : ""}</option>)}</select></div><RouteMap shipment={selected}/><p className="map-caption">Pontos com GPS ou centro aproximado da cidade informada. A linha não representa o caminho percorrido.</p></section>
+                <section className="panel feed-panel"><div className="panel-header"><div><p className="eyebrow">ATIVIDADE RECENTE</p><h2>Últimas leituras</h2></div><span className="panel-count">{feed.length}</span></div><div className="feed-list">{feed.length ? feed.map(event => <button key={event.id} className="feed-item" onClick={() => { setSelectedId(event.loadId); setTab("cargas"); }}><span className={`feed-icon ${event.status === "alert" ? "alert" : ""}`}>{event.status === "alert" ? <CircleAlert size={18}/> : <Check size={18}/>}</span><span className="feed-copy"><strong>{event.status === "alert" ? "Alerta em " : "Leitura em "}{event.place}</strong><small>{event.loadId} · {event.stage}{event.demoLoad ? " · demo" : ""}</small></span><time>{timeOnly(event.recordedAt)}</time></button>) : <p className="muted-inset">Ainda não há leituras registradas.</p>}</div></section></div>
+              <section className="panel loads-panel"><div className="panel-header"><div><p className="eyebrow">OPERAÇÃO</p><h2>Cargas monitoradas</h2></div><NewLoadDialog open={dialogOpen} setOpen={setDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy}/></div><div className="load-table-wrap"><table className="load-table"><thead><tr><th>CARGA</th><th>ROTA</th><th>ÚLTIMA LEITURA</th><th>CONDIÇÃO</th><th></th></tr></thead><tbody>{shipments.map(s => <tr key={s.id} onClick={() => { setSelectedId(s.id); setTab("cargas"); }}><td><strong>{s.id}</strong>{s.demo ? <small className="table-demo">DEMO</small> : null}<small>{s.product}</small></td><td>{s.origin} <ArrowRight size={13} className="inline-arrow"/> {s.destination}</td><td>{latest(s) ? dateTime(latest(s)!.recordedAt) : "Aguardando"}</td><td><Status alert={isAlert(s)} delivered={isDelivered(s)}/></td><td><ChevronRight size={17}/></td></tr>)}</tbody></table></div></section>
+            </>}
+          </TabsContent>
+          <TabsContent value="leitura"><div className="page-heading"><div><p className="eyebrow">CHECK-IN DE CARGA</p><h1>Registrar leitura</h1><p>Identifique a etiqueta e confirme visualmente o indicador térmico.</p></div></div><div className="form-layout"><form className="panel reading-form" onSubmit={saveReading}><div className="form-section-heading"><span className="step">01</span><div><h2>Identificação</h2><p>Leia a etiqueta NFC ou digite o código impresso.</p></div></div><button type="button" className="scan-button" onClick={() => void scanNfc()}><ScanLine size={27}/><span><strong>Escanear etiqueta NFC</strong><small>Aproxime o celular da tag</small></span><ArrowRight size={19}/></button>{scanStatus && <p className="helper-note" role="status">{scanStatus}</p>}
+            <label className="field">Código da etiqueta<input required placeholder="Ex.: TT-SE-02931" value={form.tagId} onChange={e => setForm({ ...form, tagId: e.target.value.toUpperCase() })} list="tag-options"/><datalist id="tag-options">{shipments.map(s => <option key={s.id} value={s.tagId}>{s.id}</option>)}</datalist></label>
+            <div className="form-divider"/><div className="form-section-heading"><span className="step">02</span><div><h2>Condição no ponto de passagem</h2><p>Observe o indicador físico antes de confirmar.</p></div></div><div className="form-row"><label className="field">Etapa<select value={form.stage} onChange={e => setForm({ ...form, stage: e.target.value })}><option>Expedição</option><option>Checkpoint</option><option>Recebimento</option></select></label><label className="field">Localidade<input required list="place-options" value={form.place} onChange={e => setForm({ ...form, place: e.target.value })}/><datalist id="place-options">{places.map(p => <option value={p} key={p}/>)}</datalist></label></div><label className="field">Responsável pela leitura<input required maxLength={100} placeholder="Nome de quem conferiu a carga" value={form.actor} onChange={e => setForm({ ...form, actor: e.target.value })}/></label>
+            <p className="field-caption">Condição visual da etiqueta</p><div className="condition-choices"><label className={`condition ${form.status === "normal" ? "picked" : ""}`}><input type="radio" name="condition" checked={form.status === "normal"} onChange={() => setForm({ ...form, status: "normal" })}/><span className="choice-symbol good"><Check size={18}/></span><span><strong>Indicador íntegro</strong><small>Cor original, sem ativação</small></span></label><label className={`condition danger ${form.status === "alert" ? "picked" : ""}`}><input type="radio" name="condition" checked={form.status === "alert"} onChange={() => setForm({ ...form, status: "alert" })}/><span className="choice-symbol hot"><CircleAlert size={18}/></span><span><strong>Indicador ativado</strong><small>Mudança irreversível de cor</small></span></label></div>
+            <div className="geo-row"><div><MapPin size={18}/><span>{geoMessage}</span></div><button type="button" onClick={getLocation}>Capturar GPS</button></div><button className="button-main submit-button" disabled={busy} type="submit">{busy ? "Salvando..." : "Confirmar check-in"}<ArrowRight size={18}/></button></form><aside className="reading-aside"><div className="panel explainer"><div className="aside-icon"><Smartphone size={24}/></div><h3>Uma leitura, quatro informações</h3><p>O sistema associa a etiqueta à carga e registra hora, local informado ou GPS, etapa e condição visual confirmada pelo operador.</p><div className="aside-points"><span><Check size={15}/> NFC identifica a carga</span><span><Check size={15}/> Horário salvo no servidor</span><span><Check size={15}/> Alerta no passaporte</span></div></div><div className="caution-box"><CircleAlert size={18}/><p>A tag NFC não é um termômetro. O alerta depende da inspeção visual do indicador físico calibrado para o produto.</p></div></aside></div></TabsContent>
+          <TabsContent value="cargas"><div className="page-heading"><div><p className="eyebrow">RASTREABILIDADE</p><h1>Passaportes das cargas</h1><p>Consulte o histórico e prepare a etiqueta NFC da carga.</p></div><NewLoadDialog open={dialogOpen} setOpen={setDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy}/></div>{shipments.length ? <div className="passport-layout"><div className="shipment-list" aria-label="Selecionar carga">{shipments.map(s => <button key={s.id} className={`shipment-choice ${selected?.id === s.id ? "active" : ""}`} onClick={() => { setSelectedId(s.id); setTagWriteStatus(""); }}><span className="shipment-choice-top"><strong>{s.id}</strong><ChevronRight size={17}/></span><span>{s.product}</span><small>{s.origin} → {s.destination}</small><Status alert={isAlert(s)} delivered={isDelivered(s)}/>{Boolean(s.demo) && <em>Dados de demonstração</em>}</button>)}</div>{selected && <div className="panel passport-panel"><Passport shipment={selected} tagLink={tagLink} onWriteTag={() => void writeTag()} onCopyLink={() => void copyTagLink()} tagWriteStatus={tagWriteStatus}/></div>}</div> : <div className="empty-state"><Package size={35}/><h2>Sem cargas cadastradas</h2><p>Cadastre uma carga para gerar seu passaporte digital.</p><NewLoadDialog open={dialogOpen} setOpen={setDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy}/></div>}</TabsContent>
+        </Tabs><footer>THERMOTAG SE <span>·</span> Protótipo para validação operacional <span>·</span> Horários exibidos em Brasília</footer>
+      </div>
+    </main>
+  </div>;
+}
+
+function Metric({ icon, label, value, detail, warn }: { icon: React.ReactNode; label: string; value: number; detail: string; warn?: boolean }) { return <div className={`metric ${warn ? "metric-warn" : ""}`}><span className="metric-icon">{icon}</span><div className="metric-text"><span>{label}</span><strong>{value.toString().padStart(2,"0")}</strong><small>{detail}</small></div></div>; }
+
+function NewLoadDialog({ open, setOpen, value, setValue, onSubmit, busy }: { open: boolean; setOpen: (o:boolean)=>void; value: {tagId:string;product:string;origin:string;destination:string;threshold:string}; setValue: (v: {tagId:string;product:string;origin:string;destination:string;threshold:string})=>void; onSubmit: (e:React.FormEvent)=>void; busy:boolean }) { return <Dialog open={open} onOpenChange={setOpen}><DialogTrigger asChild><button className="button-outline"><Plus size={17}/> Nova carga</button></DialogTrigger><DialogContent className="new-dialog"><DialogHeader><DialogTitle>Cadastrar carga</DialogTitle></DialogHeader><p className="dialog-subtitle">Associe o código impresso ou gravado na tag NFC a um lote.</p><form onSubmit={onSubmit} className="dialog-form"><label className="field">Código da etiqueta<input required minLength={3} maxLength={50} pattern="[A-Za-z0-9-]+" placeholder="Ex.: TT-SE-001" value={value.tagId} onChange={e=>setValue({...value,tagId:e.target.value.toUpperCase()})}/></label><label className="field">Produto ou lote<input required maxLength={100} placeholder="Ex.: Laticínios, lote 204" value={value.product} onChange={e=>setValue({...value,product:e.target.value})}/></label><div className="form-row"><label className="field">Origem<input required maxLength={100} list="cities-origin" value={value.origin} onChange={e=>setValue({...value,origin:e.target.value})}/></label><label className="field">Destino<input required maxLength={100} list="cities-origin" value={value.destination} onChange={e=>setValue({...value,destination:e.target.value})}/></label></div><datalist id="cities-origin">{places.map(p=><option key={p} value={p}/>)}</datalist><label className="field">Limiar do indicador (°C)<input type="number" min="-50" max="100" step="0.1" required value={value.threshold} onChange={e=>setValue({...value,threshold:e.target.value})}/></label><p className="dialog-help">O limiar descreve a etiqueta física escolhida para a carga. Este aplicativo não mede temperatura.</p><Button type="submit" className="dialog-submit" disabled={busy}>{busy ? "Cadastrando..." : "Cadastrar e iniciar"}</Button></form></DialogContent></Dialog>; }

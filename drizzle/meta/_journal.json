@@ -1,0 +1,13 @@
+{
+  "version": "7",
+  "dialect": "sqlite",
+  "entries": [
+    {
+      "idx": 0,
+      "version": "6",
+      "when": 1790135344758,
+      "tag": "0000_quick_harrier",
+      "breakpoints": true
+    }
+  ]
+}
