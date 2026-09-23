@@ -32,16 +32,16 @@ export function NewLoadDialog({ open, setOpen, value, setValue, onSubmit, busy, 
       <DialogHeader><DialogTitle>{createdLoadId ? "Registro concluído" : "Cadastrar carga"}</DialogTitle></DialogHeader>
       {createdLoadId ? <div className="wizard-complete" role="status">
         <span className="wizard-check"><Check size={32}/></span>
-        <h3>Registro concluído</h3><p>Carga {createdLoadId} cadastrada. Grave a URL no cartão NFC e faça a primeira leitura.</p>
+        <h3>Registro concluído</h3><p>Carga {createdLoadId} cadastrada. Você já pode fazer a primeira leitura digitando o código. Gravar a URL no cartão NFC é opcional.</p>
         <button type="button" className="button-main" onClick={() => { setStep(0); setConfirmed(false); onBeginReading(); }}>Registrar primeira leitura <ArrowRight size={17}/></button>
         <button type="button" className="button-outline" onClick={() => onOpenChange(false)}>Voltar às cargas</button>
       </div> : <>
-        <p className="dialog-subtitle" id="load-subtitle">Associe a etiqueta NFC ao lote destinado à alimentação escolar.</p>
+        <p className="dialog-subtitle" id="load-subtitle">Identifique o lote destinado à alimentação escolar. Você pode adicionar uma etiqueta NFC depois.</p>
         <div className="wizard-progress" aria-label={`Etapa ${step + 1} de 3`}><span>Etapa {step + 1} de 3</span><strong>{["Identificação", "Rota e contrato", "Indicador"][step]}</strong><div className="wizard-track"><i style={{ width: `${(step + 1) / 3 * 100}%` }}/></div></div>
         {error && <p className="wizard-error" role="alert">{error}</p>}
         <form ref={formRef} className="dialog-form wizard-form" onSubmit={event => { event.preventDefault(); if (step === 2) onSubmit(event); else next(); }}>
           {step === 0 && <div className="wizard-fields">
-            <label className="field">Código da etiqueta<input required minLength={3} maxLength={50} pattern="[A-Za-z0-9-]+" placeholder="Ex.: TT-SE-001" value={value.tagId} onChange={event => set("tagId", event.target.value.toUpperCase())}/></label>
+            <label className="field">Código da carga<input required minLength={3} maxLength={50} pattern="[A-Za-z0-9-]+" placeholder="Ex.: TT-SE-001" value={value.tagId} onChange={event => set("tagId", event.target.value.toUpperCase())}/></label>
             <label className="field">Produto ou lote<input required maxLength={100} placeholder="Ex.: Laticínios, lote 204" value={value.product} onChange={event => set("product", event.target.value)}/></label>
           </div>}
           {step === 1 && <div className="wizard-fields">

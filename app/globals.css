@@ -43,6 +43,47 @@
   .wizard-entry .button-main{width:100%}
 }
 
+.admin-view{display:grid;gap:20px}
+.admin-view .page-heading{margin-bottom:0}
+.admin-disclaimer,.admin-offline{display:flex;align-items:flex-start;gap:12px;padding:15px 18px;border-radius:10px;background:#e8f4f0;color:#265c53;font-size:14px;line-height:1.5}
+.admin-disclaimer svg,.admin-offline svg{flex:none;margin-top:1px}
+.admin-disclaimer p,.admin-offline p{margin:0}
+.admin-offline{background:#fff3dc;color:#71512d}
+.admin-metrics{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}
+.admin-metric{display:flex;flex-direction:column;gap:5px;padding:20px;border:1px solid #dde9e5;border-radius:13px;background:#fff;min-width:0}
+.admin-metric span{color:#5b7773;font-size:13px;font-weight:700}
+.admin-metric strong{color:#183d3d;font-size:32px;line-height:1.15}
+.admin-metric small{color:#78918a;font-size:12px}
+.admin-metric.warning strong{color:#bb553d}
+.admin-table-panel{min-width:0}
+.admin-filter{display:flex;align-items:center;gap:8px;font-size:13px;color:#55746d;font-weight:700}
+.admin-filter select{border:1px solid #ccded8;background:#fff;border-radius:8px;padding:9px;color:#1b4842;min-width:160px}
+.admin-table-wrap{overflow-x:auto}
+.admin-table{border-collapse:collapse;text-align:left;width:100%;font-size:13px}
+.admin-table th{background:#f5f9f7;color:#5d7971;white-space:nowrap;font-size:11px;letter-spacing:.05em;text-transform:uppercase;padding:13px 16px}
+.admin-table td{border-top:1px solid #e9f0ed;padding:17px 16px;color:#33514d;vertical-align:top;min-width:115px}
+.admin-table td:first-child{min-width:145px}
+.admin-table td:nth-child(2){min-width:190px}
+.admin-table td strong{display:block;color:#193d3d}
+.admin-table td small{display:block;color:#718a84;margin-top:5px;line-height:1.4}
+.admin-badge{display:inline-flex;padding:6px 9px;border-radius:7px;background:#e7f3ee;color:#176f57;font-size:12px;font-weight:750;white-space:nowrap}
+.admin-badge.is-alert{background:#fff0eb;color:#ae4834}
+.admin-badge.is-done{background:#ebf1f2;color:#557078}
+.admin-link{display:inline-flex;align-items:center;gap:5px;border:0;background:none;padding:5px 0;color:#086e64;font-weight:750;white-space:nowrap;font-size:13px}
+.admin-link:hover{text-decoration:underline}
+.admin-empty{padding:24px;color:#5c7a73;font-size:14px;line-height:1.5}
+.admin-empty p{margin:0 0 15px}
+.admin-secondary{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:18px}
+.admin-focus .panel-header svg{color:#648a7f;flex:none}
+.admin-focus ul{list-style:none;margin:0;padding:0 20px 16px}
+.admin-focus li{display:flex;justify-content:space-between;align-items:center;gap:15px;border-top:1px solid #e9f0ed;padding:15px 4px}
+.admin-focus li strong,.admin-focus li small{display:block}
+.admin-focus li strong{color:#234740;font-size:14px}
+.admin-focus li small{color:#718a84;font-size:12px;margin-top:5px}
+@media(max-width:1050px){.admin-metrics{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media(max-width:800px){.mobile-tabs button{flex:0 0 auto;min-width:79px}.admin-secondary{grid-template-columns:1fr}}
+@media(max-width:580px){.admin-metrics{gap:9px}.admin-metric{padding:15px}.admin-metric strong{font-size:26px}.admin-view .panel-header{flex-direction:column}.admin-filter{width:100%;justify-content:space-between}.admin-filter select{flex:1;max-width:210px}.admin-disclaimer{font-size:13px}}
+
 /* Evidência e sincronização no ponto de entrega */
 .sync-strip { display:flex; align-items:center; gap:12px; padding:10px 16px; margin-bottom:16px; border-radius:10px; background:#e8f5f2; color:#125546; font-size:14px; font-weight:600; }
 .sync-strip button { margin-left:auto; border:0; border-radius:7px; background:#146a5a; color:white; padding:7px 12px; cursor:pointer; }
