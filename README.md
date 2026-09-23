@@ -1,16 +1,17 @@
 # ThermoTag SE
 
-MVP de rastreabilidade de cargas sensíveis à temperatura. Cada carga recebe um código de etiqueta e uma URL que pode ser gravada em uma tag NFC. Ao abrir essa URL, o operador identifica a carga, confere visualmente o indicador térmico e registra um check-in com etapa, local, responsável e horário.
+MVP de apoio à fiscalização de entregas de alimentos perecíveis da alimentação escolar em Sergipe. Cada carga recebe uma URL gravada na tag NFC; o responsável fotografa o indicador térmico e registra a leitura, inclusive sem conexão depois de abrir a aplicação uma vez online.
 
-**Aplicação:** https://thermotag-se.thermotag.workers.dev/
+**Nova versão de demonstração:** https://thermotag-se-inovathon.pedrosant1905.chatgpt.site/ (acesso pela conta do projeto). A implantação em `https://thermotag-se.thermotag.workers.dev/` só receberá estas melhorias depois que você atualizar o seu repositório, aplicar as migrações e publicar novamente na sua conta Cloudflare.
 
-> A tag NFC identifica a carga; ela não mede temperatura. O estado térmico é informado pelo operador após inspeção visual de um indicador físico. O projeto é um protótipo para validação, não um sistema de medição contínua.
+> A tag NFC identifica a carga; ela não mede temperatura. A classificação por foto compara a cor amostrada com duas referências informadas no cadastro, que precisam ser validadas com o indicador físico escolhido. O protótipo não mede temperatura continuamente nem determina responsabilidade contratual.
 
 ## Funcionalidades
 
-- Cadastro de cargas com produto, origem, destino, código da etiqueta e limiar do indicador.
-- Check-ins de expedição, checkpoint e recebimento, com horário registrado no servidor.
-- Condição visual **íntegra** ou **indicador ativado**; um alerta registrado não pode voltar ao estado normal.
+- Cadastro de cargas com produto, fornecedor/agricultor familiar, contrato/pedido, escola ou destino, código da tag, limiar e duas cores de referência.
+- Check-ins com foto, seleção da área de cor na imagem e classificação de cor. Uma avaliação divergente ou inconclusiva exige justificativa; um alerta não pode voltar ao estado normal.
+- Fila local de check-ins e fotos por IndexedDB para sincronização quando a página voltar a ter conexão. Horários de captura são do aparelho; o servidor registra a hora do recebimento.
+- Histórico de fotos, cor analisada e justificativa em cada registro.
 - GPS opcional com permissão do dispositivo; preenchimento manual de localidade como alternativa.
 - Passaporte digital com histórico de leituras, alerta e intervalo entre o último registro normal e o primeiro alerta.
 - Painel com cargas, leituras, ocorrências e mapa esquemático.
@@ -22,7 +23,7 @@ MVP de rastreabilidade de cargas sensíveis à temperatura. Cada carga recebe um
 2. Em **Passaportes**, selecione a carga e copie ou grave a URL gerada: `https://thermotag-se.thermotag.workers.dev/?tag=TT-SE-001`.
 3. Grave essa URL em uma **tag NFC NDEF gravável**, como um registro do tipo **URL**. A tag não precisa vir programada; o sistema gera o link após o cadastro, mas a gravação exige um celular ou aplicativo compatível.
 4. Aproxime a tag do celular. O link abre o formulário com o código da carga preenchido.
-5. Confira o indicador físico, preencha os dados e confirme o check-in. **A aproximação da tag não salva um registro automaticamente.**
+5. Fotografe o indicador, toque na área colorida da foto, confira a classificação e confirme o check-in. **A aproximação da tag não salva um registro automaticamente.**
 
 | Dispositivo | Leitura | Gravação |
 | --- | --- | --- |
@@ -31,20 +32,24 @@ MVP de rastreabilidade de cargas sensíveis à temperatura. Cada carga recebe um
 
 O Safari no iPhone não disponibiliza o leitor Web NFC dentro da página. A leitura da URL gravada na tag é feita pelo próprio iOS em aparelhos compatíveis, em geral iPhone XS ou posterior. Também é possível digitar o código da etiqueta manualmente. Use tags NDEF graváveis; durante os testes, não bloqueie a tag para gravação.
 
-O código e o link da carga ficam na tag. Histórico, status, horário e localização ficam no banco D1. A etiqueta NFC e o indicador físico de temperatura são componentes diferentes.
+O código e o link da carga ficam na tag. Histórico, status, horários e localização ficam no D1; as fotos são armazenadas no R2. A etiqueta NFC e o indicador físico de temperatura são componentes diferentes.
 
 ## Demonstração rápida
 
 Na aplicação, clique em **Carregar demonstração** para criar duas cargas fictícias. A primeira inclui uma ocorrência de alerta; a segunda permanece em trânsito. Abra **Passaportes** para consultar o histórico ou **Registrar leitura** para fazer um novo check-in de teste. Clicar novamente em **Carregar demonstração** não duplica essas cargas.
 
+## Registro sem conexão
+
+Abra a aplicação com internet ao menos uma vez no aparelho e cadastre uma carga antes de testar offline. Sem rede, mantenha a aba aberta, fotografe e registre; o contador de pendências aparece no topo. Ao voltar a ter internet, a página aberta sincroniza os registros em ordem ou você pode clicar em **Sincronizar agora**. O service worker tenta manter a página disponível para reabertura offline, mas o navegador pode eliminar seu armazenamento; no iPhone, se a tag não abrir a página sem rede, use uma aba já aberta ou digite o código. Não há sincronização garantida com o navegador fechado.
+
 ## Tecnologias
 
 - **Interface:** TypeScript, React, componentes Base UI e CSS.
 - **Aplicação web:** Vinext, Vite e Cloudflare Workers.
-- **Persistência:** Cloudflare D1 (SQLite); esquema em `db/schema.ts` e SQL inicial em `drizzle/0000_quick_harrier.sql`.
+- **Persistência:** Cloudflare D1 (registros), R2 (fotos), IndexedDB (fila offline) e service worker (arquivos da página). Esquema em `db/schema.ts`.
 - **NFC:** Web NFC quando disponível no navegador; URL NDEF para abertura pelo sistema do celular.
 
-O projeto usa o vínculo D1 chamado `DB`, referenciado no código do servidor. As rotas principais são `GET /api/shipments`, `POST /api/shipments`, `POST /api/checkins` e `POST /api/demo`.
+O projeto usa os vínculos `DB` e `BUCKET`, referenciado no código do servidor. As rotas principais são `GET /api/shipments`, `POST /api/shipments`, `POST /api/checkins` e `POST /api/demo`.
 
 ## Executar localmente
 
@@ -57,35 +62,40 @@ corepack pnpm exec wrangler d1 execute DB --local --config dist/server/wrangler.
 corepack pnpm dev
 ```
 
-Abra o endereço exibido pelo terminal (normalmente `http://localhost:5173`). A importação do SQL é necessária **uma vez por banco local**. Os dados locais ficam em `.wrangler/state` e são separados dos dados publicados.
+Abra o endereço exibido pelo terminal (normalmente `http://localhost:5173`). Antes do primeiro uso destas funções, execute também as migrações `drizzle/0001_square_ogun.sql` e `drizzle/0002_organic_molly_hayes.sql`, nessa ordem, com o mesmo comando local acima, alterando somente `--file`. Se o banco local já existia, execute apenas `0001` e `0002`; não repita `0000`.
 
 No Windows, se `corepack enable` falhar por falta de permissão em `C:\Program Files\nodejs`, use `corepack pnpm` diretamente, como nos comandos acima. Para executar o build com o servidor local do Wrangler, use `corepack pnpm start` depois de aplicar o SQL.
 
 ## Publicar na própria conta Cloudflare
 
-O projeto precisa de um Worker e de um banco D1; uma hospedagem apenas de arquivos estáticos não executa as rotas da API.
+O projeto precisa de um Worker, banco D1 e bucket R2; uma hospedagem apenas de arquivos estáticos não executa as rotas da API.
 
 1. Entre na sua conta e crie o banco:
 
    ```powershell
    corepack pnpm exec wrangler login
    corepack pnpm exec wrangler d1 create thermotag-se-db
+   corepack pnpm exec wrangler r2 bucket create thermotag-evidence
    ```
 
-2. Em `vite.config.ts`, no objeto `d1_databases`, configure `database_name: "thermotag-se-db"` e substitua `database_id` pelo ID retornado. **Mantenha `binding: d1`**, pois `.openai/hosting.json` define `d1` como `DB`.
+2. Em `vite.config.ts`, no objeto `d1_databases`, configure `database_name: "thermotag-se-db"` e substitua `database_id` pelo ID retornado. No objeto `r2_buckets`, configure `bucket_name: "thermotag-evidence"`. Mantenha os vínculos `DB` e `BUCKET` de `.openai/hosting.json`.
 3. Gere a aplicação, crie as tabelas no banco remoto e publique:
 
    ```powershell
    corepack pnpm build
    corepack pnpm exec wrangler d1 execute thermotag-se-db --remote --config dist/server/wrangler.json --file drizzle/0000_quick_harrier.sql
+   corepack pnpm exec wrangler d1 execute thermotag-se-db --remote --config dist/server/wrangler.json --file drizzle/0001_square_ogun.sql
+   corepack pnpm exec wrangler d1 execute thermotag-se-db --remote --config dist/server/wrangler.json --file drizzle/0002_organic_molly_hayes.sql
    corepack pnpm exec wrangler deploy --config dist/server/wrangler.json --name thermotag-se
    ```
 
-A importação do SQL remoto é feita **somente na primeira publicação desse banco**. Nas publicações seguintes, execute o build e o deploy. O Wrangler informa a URL `*.workers.dev`; novas tags devem usar a URL dessa implantação.
+Se o banco remoto já contém o MVP anterior, **não repita `0000`**: aplique somente `0001` e `0002`, nessa ordem, antes do deploy. Em banco novo, execute as três migrações uma única vez. Nas publicações seguintes, execute o build e o deploy. O Wrangler informa a URL `*.workers.dev`; novas tags devem usar a URL dessa implantação.
 
 ## Estado e limites do MVP
 
-- A versão publicada **não tem autenticação própria** nas rotas da API. Qualquer pessoa com acesso à URL pode consultar cargas e enviar novos registros. Use apenas dados fictícios até adicionar controle de acesso.
+- O MVP **não tem autenticação própria** nas rotas nem proteção das fotos. Qualquer pessoa com a URL pode consultar cargas e fotos ou enviar registros. Use somente dados fictícios de teste; contratos reais exigem autenticação, permissões e política de retenção.
+- A classificação usa a média de 11 × 11 pixels escolhidos na foto e limiares simples de distância entre cores. Luz, reflexos, balanço de branco e região escolhida podem alterar o resultado. Calibre e valide em amostras reais de cada indicador.
+- O horário da captura offline depende do relógio do aparelho, e a foto pode ser alterada antes do envio. São evidências para o fiscal analisar, sem certificação pericial.
 - O GPS depende das permissões do navegador. Sem GPS, o operador pode informar a localidade; o mapa usa o centro aproximado de cidades conhecidas. As linhas no mapa não representam a rota real percorrida.
 - O indicador térmico físico ainda precisa ser selecionado e validado para cada faixa de temperatura. O software não lê a temperatura da tag e não substitui um sensor ou data logger.
 - Leituras no iPhone abrem um link gravado na tag. Um leitor NFC iniciado por botão dentro do Safari exigiria uma capacidade que o navegador não oferece.
@@ -99,6 +109,6 @@ A importação do SQL remoto é feita **somente na primeira publicação desse b
 | `app/globals.css` | Estilos da interface |
 | `lib/` | Modelo e acesso ao D1 |
 | `db/` e `drizzle/` | Esquema e SQL inicial |
-| `vite.config.ts` | Configuração do Worker e do vínculo D1 |
+| `vite.config.ts` | Configuração do Worker, D1 e R2 |
 
 Projeto desenvolvido como MVP do **Inovathon SE**.

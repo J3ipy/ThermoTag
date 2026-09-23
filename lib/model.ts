@@ -2,11 +2,15 @@ export type Checkin = {
   id: string; shipmentId: string; stage: string; place: string; actor: string;
   status: "normal" | "alert"; latitude: number | null; longitude: number | null;
   locationSource: "device" | "manual"; recordedAt: string; demo: number;
+  capturedAt: string | null; photoKey: string | null; sampledColor: string | null;
+  colorResult: "normal" | "alert" | "uncertain" | null; justification: string | null;
 };
 
 export type Shipment = {
   id: string; tagId: string; product: string; origin: string; destination: string;
   threshold: number; createdAt: string; demo: number; checkins: Checkin[];
+  supplier: string | null; contractReference: string | null;
+  intactColor: string | null; activatedColor: string | null;
 };
 
 export const coordinates: Record<string, [number, number]> = {
