@@ -82,6 +82,7 @@ export default function Home() {
   const [location, setLocation] = useState<{ latitude: number; longitude: number } | null>(null);
   const [geoMessage, setGeoMessage] = useState("Localização não capturada; o local informado será registrado.");
   const [scanStatus, setScanStatus] = useState("");
+  const [webNfcAvailable, setWebNfcAvailable] = useState(false);
   const [tagWriteStatus, setTagWriteStatus] = useState("");
   const [origin, setOrigin] = useState("");
   const handledLink = useRef(false);
@@ -99,6 +100,7 @@ export default function Home() {
   }, []);
   useEffect(() => { void refresh(); }, [refresh]);
   useEffect(() => { setOrigin(window.location.origin); }, []);
+  useEffect(() => { setWebNfcAvailable("NDEFReader" in window); }, []);
   useEffect(() => {
     if (loading || handledLink.current) return;
     handledLink.current = true;
@@ -130,8 +132,13 @@ export default function Home() {
   const saveReading = (e: React.FormEvent) => { e.preventDefault(); void submit("/api/checkins", { ...form, ...location }, () => { setTab("cargas"); const found = shipments.find(s => s.tagId === form.tagId.toUpperCase()); if (found) setSelectedId(found.id); setNotice("Check-in registrado com horário do servidor."); setLocation(null); }); };
   const getLocation = () => {
     if (!navigator.geolocation) { setGeoMessage("Este navegador não oferece geolocalização. Informe o local."); return; }
+    setLocation(null);
     setGeoMessage("Obtendo localização...");
-    navigator.geolocation.getCurrentPosition(p => { setLocation({ latitude: p.coords.latitude, longitude: p.coords.longitude }); setGeoMessage(`GPS capturado · ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`); }, () => { setLocation(null); setGeoMessage("Acesso à localização negado ou indisponível. Informe o local."); }, { enableHighAccuracy: true, timeout: 10000, maximumAge: 30000 });
+    navigator.geolocation.getCurrentPosition(p => { setLocation({ latitude: p.coords.latitude, longitude: p.coords.longitude }); setGeoMessage(`GPS capturado · ${p.coords.latitude.toFixed(4)}, ${p.coords.longitude.toFixed(4)}`); }, error => {
+      if (error.code === error.PERMISSION_DENIED) setGeoMessage("Localização bloqueada. No iPhone, permita a localização para o Safari e para este site nos Ajustes; ou informe o local manualmente.");
+      else if (error.code === error.TIMEOUT) setGeoMessage("O GPS demorou a responder. Tente novamente em local aberto ou informe o local manualmente.");
+      else setGeoMessage("Não foi possível obter o GPS. Informe o local manualmente.");
+    }, { enableHighAccuracy: true, timeout: 20000, maximumAge: 30000 });
   };
   const scanNfc = async () => {
     const Reader = (window as unknown as { NDEFReader?: new () => NDEFReaderLike }).NDEFReader;
@@ -147,13 +154,19 @@ export default function Home() {
         for (const record of event.message.records) {
           if (record.recordType === "text" || record.recordType === "url") {
             const value = new TextDecoder(record.encoding || "utf-8").decode(record.data);
-            const match = value.toUpperCase().match(/TT-[A-Z0-9-]+/);
-            if (match) { code = match[0]; break; }
+            try {
+              const url = new URL(value);
+              if (url.origin === window.location.origin) code = url.searchParams.get("tag")?.trim().toUpperCase() || "";
+            } catch {
+              if (record.recordType === "text") code = value.trim().toUpperCase();
+            }
+            if (/^[A-Z0-9-]{3,50}$/.test(code)) break;
+            code = "";
           }
         }
         code ||= event.serialNumber?.toUpperCase().replace(/[^A-Z0-9-]/g, "") || "";
         setForm(f => ({ ...f, tagId: code }));
-        setScanStatus(code ? `Etiqueta lida: ${code}. Confirme o indicador visual e registre.` : "Etiqueta detectada sem código. Digite o código impresso.");
+        setScanStatus(!code ? "Etiqueta detectada sem código. Digite o código impresso." : shipments.some(s => s.tagId === code) ? `Etiqueta lida: ${code}. Confirme o indicador visual e registre.` : `Código ${code} lido, mas ainda não cadastrado. Cadastre a carga antes do check-in.`);
         abort.abort();
       };
     } catch { setScanStatus("Leitura NFC cancelada ou indisponível. Digite o código da etiqueta."); }
@@ -186,7 +199,7 @@ export default function Home() {
               <section className="panel loads-panel"><div className="panel-header"><div><p className="eyebrow">OPERAÇÃO</p><h2>Cargas monitoradas</h2></div><NewLoadDialog open={dialogOpen} setOpen={setDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy}/></div><div className="load-table-wrap"><table className="load-table"><thead><tr><th>CARGA</th><th>ROTA</th><th>ÚLTIMA LEITURA</th><th>CONDIÇÃO</th><th></th></tr></thead><tbody>{shipments.map(s => <tr key={s.id} onClick={() => { setSelectedId(s.id); setTab("cargas"); }}><td><strong>{s.id}</strong>{s.demo ? <small className="table-demo">DEMO</small> : null}<small>{s.product}</small></td><td>{s.origin} <ArrowRight size={13} className="inline-arrow"/> {s.destination}</td><td>{latest(s) ? dateTime(latest(s)!.recordedAt) : "Aguardando"}</td><td><Status alert={isAlert(s)} delivered={isDelivered(s)}/></td><td><ChevronRight size={17}/></td></tr>)}</tbody></table></div></section>
             </>}
           </TabsContent>
-          <TabsContent value="leitura"><div className="page-heading"><div><p className="eyebrow">CHECK-IN DE CARGA</p><h1>Registrar leitura</h1><p>Identifique a etiqueta e confirme visualmente o indicador térmico.</p></div></div><div className="form-layout"><form className="panel reading-form" onSubmit={saveReading}><div className="form-section-heading"><span className="step">01</span><div><h2>Identificação</h2><p>Leia a etiqueta NFC ou digite o código impresso.</p></div></div><button type="button" className="scan-button" onClick={() => void scanNfc()}><ScanLine size={27}/><span><strong>Escanear etiqueta NFC</strong><small>Aproxime o celular da tag</small></span><ArrowRight size={19}/></button>{scanStatus && <p className="helper-note" role="status">{scanStatus}</p>}
+          <TabsContent value="leitura"><div className="page-heading"><div><p className="eyebrow">CHECK-IN DE CARGA</p><h1>Registrar leitura</h1><p>Identifique a etiqueta e confirme visualmente o indicador térmico.</p></div></div><div className="form-layout"><form className="panel reading-form" onSubmit={saveReading}><div className="form-section-heading"><span className="step">01</span><div><h2>Identificação</h2><p>Leia a etiqueta NFC ou digite o código impresso.</p></div></div>{webNfcAvailable ? <button type="button" className="scan-button" onClick={() => void scanNfc()}><ScanLine size={27}/><span><strong>Escanear etiqueta NFC</strong><small>Aproxime o celular da tag</small></span><ArrowRight size={19}/></button> : <p className="helper-note">No iPhone, grave a URL da carga na tag NFC, acenda a tela e aproxime a parte superior do aparelho. Toque na notificação para abrir esta ficha. O Safari não ativa um leitor NFC dentro da página.</p>}{scanStatus && <p className="helper-note" role="status">{scanStatus}</p>}
             <label className="field">Código da etiqueta<input required placeholder="Ex.: TT-SE-02931" value={form.tagId} onChange={e => setForm({ ...form, tagId: e.target.value.toUpperCase() })} list="tag-options"/><datalist id="tag-options">{shipments.map(s => <option key={s.id} value={s.tagId}>{s.id}</option>)}</datalist></label>
             <div className="form-divider"/><div className="form-section-heading"><span className="step">02</span><div><h2>Condição no ponto de passagem</h2><p>Observe o indicador físico antes de confirmar.</p></div></div><div className="form-row"><label className="field">Etapa<select value={form.stage} onChange={e => setForm({ ...form, stage: e.target.value })}><option>Expedição</option><option>Checkpoint</option><option>Recebimento</option></select></label><label className="field">Localidade<input required list="place-options" value={form.place} onChange={e => setForm({ ...form, place: e.target.value })}/><datalist id="place-options">{places.map(p => <option value={p} key={p}/>)}</datalist></label></div><label className="field">Responsável pela leitura<input required maxLength={100} placeholder="Nome de quem conferiu a carga" value={form.actor} onChange={e => setForm({ ...form, actor: e.target.value })}/></label>
             <p className="field-caption">Condição visual da etiqueta</p><div className="condition-choices"><label className={`condition ${form.status === "normal" ? "picked" : ""}`}><input type="radio" name="condition" checked={form.status === "normal"} onChange={() => setForm({ ...form, status: "normal" })}/><span className="choice-symbol good"><Check size={18}/></span><span><strong>Indicador íntegro</strong><small>Cor original, sem ativação</small></span></label><label className={`condition danger ${form.status === "alert" ? "picked" : ""}`}><input type="radio" name="condition" checked={form.status === "alert"} onChange={() => setForm({ ...form, status: "alert" })}/><span className="choice-symbol hot"><CircleAlert size={18}/></span><span><strong>Indicador ativado</strong><small>Mudança irreversível de cor</small></span></label></div>
