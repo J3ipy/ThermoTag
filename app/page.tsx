@@ -41,14 +41,14 @@ function RouteMap({ shipment }: { shipment: Shipment | undefined }) {
   return <div className="map-canvas" role="img" aria-label={points.length ? `Mapa esquemático de ${points.length} registros geográficos da carga ${shipment?.id}` : "Mapa esquemático sem registros geográficos"}>
     <div className="map-top"><span><Compass size={15} /> Sergipe · pontos registrados</span><span className="map-scale">Visão geográfica simplificada</span></div>
     <svg viewBox="0 0 700 390" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
-      <defs><pattern id="mapGrid" width="46" height="46" patternUnits="userSpaceOnUse"><path d="M 46 0 L 0 0 0 46" fill="none" stroke="#264651" strokeWidth="1" opacity=".33" /></pattern><linearGradient id="sea"><stop stopColor="#12333b"/><stop offset="1" stopColor="#0c2831"/></linearGradient></defs>
+      <defs><pattern id="mapGrid" width="46" height="46" patternUnits="userSpaceOnUse"><path d="M 46 0 L 0 0 0 46" fill="none" stroke="#4b8bc1" strokeWidth="1" opacity=".33" /></pattern><linearGradient id="sea"><stop stopColor="#0b2d69"/><stop offset="1" stopColor="#081b46"/></linearGradient></defs>
       <rect width="700" height="390" fill="url(#sea)"/><rect width="700" height="390" fill="url(#mapGrid)"/>
-      <path d="M580 0 C550 90 630 140 600 213 C565 291 625 360 595 390 L700 390 L700 0Z" fill="#17404b" opacity=".75" />
-      <path d="M580 0 C550 90 630 140 600 213 C565 291 625 360 595 390" fill="none" stroke="#3e777e" strokeWidth="2" opacity=".7" />
-      <text x="632" y="190" fill="#6aa0a4" fontSize="12" transform="rotate(90 632 190)">OCEANO ATLÂNTICO</text>
-      <text x="48" y="365" fill="#65858c" fontSize="11" letterSpacing="2">37° O</text><text x="480" y="365" fill="#65858c" fontSize="11" letterSpacing="2">11° S</text>
-      {points.length > 1 && <polyline points={polyline} fill="none" stroke="#79d0bb" strokeWidth="3" strokeDasharray="8 7" strokeLinecap="round" />}
-      {points.map((p, i) => <g key={p.id}><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="15" fill={p.status === "alert" ? "#e77a60" : "#4ac3a8"} opacity=".18" /><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="7" fill={p.status === "alert" ? "#f28c74" : "#66d9bb"} stroke="#0b252c" strokeWidth="2" /><text x={x(p.longitude!) + 13} y={y(p.latitude!) - (i % 2 ? 10 : -23)} fill="#edf9f5" fontSize="12" fontWeight="600" paintOrder="stroke" stroke="#0b252c" strokeWidth="4">{p.place}</text></g>)}
+      <path d="M580 0 C550 90 630 140 600 213 C565 291 625 360 595 390 L700 390 L700 0Z" fill="#16467e" opacity=".75" />
+      <path d="M580 0 C550 90 630 140 600 213 C565 291 625 360 595 390" fill="none" stroke="#4c9bc3" strokeWidth="2" opacity=".7" />
+      <text x="632" y="190" fill="#8bc6e6" fontSize="12" transform="rotate(90 632 190)">OCEANO ATLÂNTICO</text>
+      <text x="48" y="365" fill="#9bbede" fontSize="11" letterSpacing="2">37° O</text><text x="480" y="365" fill="#9bbede" fontSize="11" letterSpacing="2">11° S</text>
+      {points.length > 1 && <polyline points={polyline} fill="none" stroke="#61ddec" strokeWidth="3" strokeDasharray="8 7" strokeLinecap="round" />}
+      {points.map((p, i) => <g key={p.id}><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="15" fill={p.status === "alert" ? "#f59aa7" : "#3ccde8"} opacity=".18" /><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="7" fill={p.status === "alert" ? "#ffb0a4" : "#72e9f7"} stroke="#0b2553" strokeWidth="2" /><text x={x(p.longitude!) + 13} y={y(p.latitude!) - (i % 2 ? 10 : -23)} fill="#edf9ff" fontSize="12" fontWeight="600" paintOrder="stroke" stroke="#0b2553" strokeWidth="4">{p.place}</text></g>)}
     </svg>
     <div className="map-legend"><span><i className="legend-dot" /> Indicador íntegro</span><span><i className="legend-dot red" /> Indicador ativado</span></div>
   </div>;
@@ -71,6 +71,22 @@ function Passport({ shipment, tagLink, onWriteTag, onCopyLink, tagWriteStatus }:
 
 type NDEFRecordLike = { recordType: string; data: DataView; encoding?: string };
 type NDEFReaderLike = { scan: (options?: { signal?: AbortSignal }) => Promise<void>; write: (message: {records: {recordType: "url"; data: string}[]}) => Promise<void>; onreading: ((event: { serialNumber: string; message: { records: NDEFRecordLike[] } }) => void) | null; onreadingerror: (() => void) | null };
+
+function ShipmentSpotlight({ shipment, onOpen }: { shipment: Shipment; onOpen: () => void }) {
+  const last = latest(shipment);
+  const alert = isAlert(shipment);
+  const label = alert ? "Alerta registrado" : last ? "Leitura registrada" : "Aguardando leitura";
+  return <section className={`shipment-spotlight ${alert ? "has-alert" : ""}`} aria-label={`Carga selecionada ${shipment.id}`}>
+    <div className="spotlight-details">
+      <div className="spotlight-heading"><span>CARGA EM DESTAQUE</span><span className="spotlight-pill"><i />{alert ? "Verificar alerta" : isDelivered(shipment) ? "Recebida" : last ? "Em acompanhamento" : "Nova carga"}</span></div>
+      <h2>{shipment.id}</h2><p className="spotlight-product">{shipment.product}{shipment.demo ? " · Demonstração" : ""}</p>
+      <div className="spotlight-route"><div><span className="spotlight-node"/><div><small>ORIGEM</small><strong>{shipment.origin}</strong></div></div><div><span className="spotlight-node"/><div><small>DESTINO</small><strong>{shipment.destination}</strong></div></div></div>
+      <div className="spotlight-facts"><div><small>ETAPA</small><strong>{last?.stage || "Sem leitura"}</strong></div><div><small>LIMIAR DO INDICADOR</small><strong>{shipment.threshold} °C</strong></div><div><small>ÚLTIMO REGISTRO</small><strong>{last ? dateTime(last.recordedAt) : "Aguardando"}</strong></div></div>
+      <button type="button" className="spotlight-link" onClick={onOpen}>Abrir passaporte <ArrowRight size={17}/></button>
+    </div>
+    <div className="spotlight-verification"><div className="signal-rings"><div className="signal-core">{alert ? <CircleAlert size={31}/> : last ? <Check size={31}/> : <ScanLine size={31}/>}</div></div><strong>{label}</strong><span>{last ? `${last.stage} em ${last.place}` : "Registre o primeiro checkpoint"}</span></div>
+  </section>;
+}
 
 export default function Home() {
   const [shipments, setShipments] = useState<Shipment[]>([]);
@@ -273,6 +289,7 @@ export default function Home() {
         <Tabs value={tab} onValueChange={value => value === "leitura" ? openReading() : setTab(value)}><TabsList className="mobile-tabs"><TabsTrigger value="painel">Painel</TabsTrigger><TabsTrigger value="leitura">Leitura</TabsTrigger><TabsTrigger value="cargas">Cargas</TabsTrigger><TabsTrigger value="admin">Admin</TabsTrigger></TabsList>
           <TabsContent value="painel"><div className="page-heading"><div><p className="eyebrow">PAINEL DE MONITORAMENTO</p><h1>Visão geral da operação</h1><p>Acompanhe as entregas de alimentos perecíveis para a alimentação escolar.</p></div><button className="button-main" onClick={() => openReading()}><ScanLine size={18}/> Nova leitura</button></div>
             {loading ? <div className="loading">Carregando cargas...</div> : shipments.length === 0 ? <div className="empty-state"><div className="empty-icon"><Radio size={30}/></div><h2>Pronto para monitorar a primeira carga</h2><p>Cadastre uma etiqueta ou carregue o percurso simulado para conhecer o painel.</p><div className="empty-actions"><NewLoadDialog open={dialogOpen} setOpen={handleLoadDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy} createdLoadId={createdLoadId} error={error} onBeginReading={() => { setDialogOpen(false); openReading(); }}/><button className="button-outline" onClick={loadDemo} disabled={busy}>Carregar demonstração</button></div></div> : <>
+              {selected && <ShipmentSpotlight shipment={selected} onOpen={() => setTab("cargas")}/>}
               <div className="metrics"><Metric icon={<Package size={20}/>} label="Cargas cadastradas" value={shipments.length} detail={`${active} em andamento`}/><Metric icon={<ScanLine size={20}/>} label="Leituras registradas" value={readings} detail="Em todas as etapas"/><Metric icon={<CircleAlert size={20}/>} label="Cargas com alerta" value={alerts} detail="Indicador ativado" warn/></div>
               <div className="dashboard-grid"><section className="panel map-panel"><div className="panel-header"><div><p className="eyebrow">INTELIGÊNCIA TERRITORIAL</p><h2>Trajeto da carga</h2></div><select aria-label="Selecionar carga no mapa" value={selected?.id || ""} onChange={e => setSelectedId(e.target.value)}>{shipments.map(s => <option value={s.id} key={s.id}>{s.id}{s.demo ? " · demo" : ""}</option>)}</select></div><RouteMap shipment={selected}/><p className="map-caption">Pontos com GPS ou centro aproximado da cidade informada. A linha não representa o caminho percorrido.</p></section>
                 <section className="panel feed-panel"><div className="panel-header"><div><p className="eyebrow">ATIVIDADE RECENTE</p><h2>Últimas leituras</h2></div><span className="panel-count">{feed.length}</span></div><div className="feed-list">{feed.length ? feed.map(event => <button key={event.id} className="feed-item" onClick={() => { setSelectedId(event.loadId); setTab("cargas"); }}><span className={`feed-icon ${event.status === "alert" ? "alert" : ""}`}>{event.status === "alert" ? <CircleAlert size={18}/> : <Check size={18}/>}</span><span className="feed-copy"><strong>{event.status === "alert" ? "Alerta em " : "Leitura em "}{event.place}</strong><small>{event.loadId} · {event.stage}{event.demoLoad ? " · demo" : ""}</small></span><time>{timeOnly(event.recordedAt)}</time></button>) : <p className="muted-inset">Ainda não há leituras registradas.</p>}</div></section></div>
