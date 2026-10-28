@@ -38,6 +38,7 @@ function RouteMap({ shipment }: { shipment: Shipment | undefined }) {
   const x = (lon: number) => 55 + ((lon + 37.73) / 0.78) * 570;
   const y = (lat: number) => 330 - ((lat + 11.42) / 0.72) * 270;
   const polyline = points.map(p => `${x(p.longitude!)},${y(p.latitude!)}`).join(" ");
+  const motionPath = points.map((p, i) => `${i ? "L" : "M"}${x(p.longitude!)},${y(p.latitude!)}`).join(" ");
   return <div className="map-canvas" role="img" aria-label={points.length ? `Mapa esquemático de ${points.length} registros geográficos da carga ${shipment?.id}` : "Mapa esquemático sem registros geográficos"}>
     <div className="map-top"><span><Compass size={15} /> Sergipe · pontos registrados</span><span className="map-scale">Visão geográfica simplificada</span></div>
     <svg viewBox="0 0 700 390" preserveAspectRatio="xMidYMid meet" aria-hidden="true">
@@ -48,7 +49,27 @@ function RouteMap({ shipment }: { shipment: Shipment | undefined }) {
       <text x="632" y="190" fill="#8bc6e6" fontSize="12" transform="rotate(90 632 190)">OCEANO ATLÂNTICO</text>
       <text x="48" y="365" fill="#9bbede" fontSize="11" letterSpacing="2">37° O</text><text x="480" y="365" fill="#9bbede" fontSize="11" letterSpacing="2">11° S</text>
       {points.length > 1 && <polyline points={polyline} fill="none" stroke="#61ddec" strokeWidth="3" strokeDasharray="8 7" strokeLinecap="round" />}
-      {points.map((p, i) => <g key={p.id}><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="15" fill={p.status === "alert" ? "#f59aa7" : "#3ccde8"} opacity=".18" /><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="7" fill={p.status === "alert" ? "#ffb0a4" : "#72e9f7"} stroke="#0b2553" strokeWidth="2" /><text x={x(p.longitude!) + 13} y={y(p.latitude!) - (i % 2 ? 10 : -23)} fill="#edf9ff" fontSize="12" fontWeight="600" paintOrder="stroke" stroke="#0b2553" strokeWidth="4">{p.place}</text></g>)}
+      {points.length > 0 && <g key={shipment?.id + motionPath}>
+        <g className="route-truck-motion">
+          {points.length > 1 && <animateMotion path={motionPath} dur={`${Math.max(8, points.length * 3)}s`} repeatCount="indefinite" calcMode="paced"/>}
+          <g transform={points.length === 1 ? `translate(${x(points[0].longitude!)},${y(points[0].latitude!)})` : undefined}>
+            <g transform="translate(-17,-38)" strokeLinejoin="round">
+              <ellipse cx="17" cy="39" rx="25" ry="7" fill="#030f2a" opacity=".5"/>
+              <path d="M-10 9 L5 0 L33 10 L18 19Z" fill="#f1feff" stroke="#8addf3"/>
+              <path d="M-10 9 L18 19 L18 37 L-10 27Z" fill="#a6d7ee" stroke="#578bb0"/>
+              <path d="M18 19 L33 10 L33 29 L18 37Z" fill="#559cc6" stroke="#578bb0"/>
+              <path d="M18 29 L33 21 L43 28 L28 37Z" fill="#74e8ff"/>
+              <path d="M28 37 L43 28 L43 38 L28 47Z" fill="#1384b8"/>
+              <path d="M18 29 L28 37 L28 47 L18 40Z" fill="#32bddd"/>
+              <path d="M30 37 L41 31 L41 35 L30 41Z" fill="#0a355c"/>
+              <ellipse cx="-3" cy="29" rx="4" ry="6" fill="#06182f" stroke="#86d5ea"/>
+              <ellipse cx="23" cy="43" rx="4" ry="6" fill="#06182f" stroke="#86d5ea"/>
+              <path d="M34 42 L41 38" stroke="#efffff" strokeWidth="2"/>
+            </g>
+          </g>
+        </g>
+      </g>}
+      {points.map((p, i) => <g key={p.id}><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="15" fill={p.status === "alert" ? "#ff3434" : "#3ccde8"} opacity=".18" /><circle cx={x(p.longitude!)} cy={y(p.latitude!)} r="7" fill={p.status === "alert" ? "#ff3434" : "#72e9f7"} stroke="#0b2553" strokeWidth="2" /><text x={x(p.longitude!) + 13} y={y(p.latitude!) - (i % 2 ? 10 : -23)} fill="#edf9ff" fontSize="12" fontWeight="600" paintOrder="stroke" stroke="#0b2553" strokeWidth="4">{p.place}</text></g>)}
     </svg>
     <div className="map-legend"><span><i className="legend-dot" /> Indicador íntegro</span><span><i className="legend-dot red" /> Indicador ativado</span></div>
   </div>;
@@ -71,15 +92,6 @@ function Passport({ shipment, tagLink, onWriteTag, onCopyLink, tagWriteStatus }:
 
 type NDEFRecordLike = { recordType: string; data: DataView; encoding?: string };
 type NDEFReaderLike = { scan: (options?: { signal?: AbortSignal }) => Promise<void>; write: (message: {records: {recordType: "url"; data: string}[]}) => Promise<void>; onreading: ((event: { serialNumber: string; message: { records: NDEFRecordLike[] } }) => void) | null; onreadingerror: (() => void) | null };
-
-function TrackingJourney() {
-  return <section className="tracking-journey" aria-labelledby="tracking-journey-title">
-    <div className="tracking-journey-header"><div><p className="eyebrow">COMO FUNCIONA</p><h2 id="tracking-journey-title">Da origem ao destino</h2><p>Cada check-in registra uma etapa e atualiza o passaporte digital da carga.</p></div><span className="tracking-demo-label">Ilustração do fluxo</span></div>
-    <picture><source media="(prefers-reduced-motion: reduce)" srcSet="/trajeto-caminhao.png"/><img className="tracking-journey-gif" src="/trajeto-caminhao.gif" width="800" height="190" alt="Caminhão percorre a rota da origem, passa por dois pontos de leitura e chega ao destino"/></picture>
-    <div className="tracking-journey-stages" aria-hidden="true"><span>Origem</span><span>Leitura 1</span><span>Leitura 2</span><span>Destino</span></div>
-    <p className="tracking-journey-note">Animação explicativa. O mapa e o histórico mostram pontos registrados nos check-ins; não há localização em tempo real.</p>
-  </section>;
-}
 
 function ShipmentSpotlight({ shipment, onOpen }: { shipment: Shipment; onOpen: () => void }) {
   const last = latest(shipment);
@@ -297,11 +309,10 @@ export default function Home() {
         {notice && <div className="feedback success" role="status"><Check size={17}/>{notice}<button onClick={() => setNotice("")} aria-label="Fechar aviso"><X size={16}/></button></div>}
         <Tabs value={tab} onValueChange={value => value === "leitura" ? openReading() : setTab(value)}><TabsList className="mobile-tabs"><TabsTrigger value="painel">Painel</TabsTrigger><TabsTrigger value="leitura">Leitura</TabsTrigger><TabsTrigger value="cargas">Cargas</TabsTrigger><TabsTrigger value="admin">Admin</TabsTrigger></TabsList>
           <TabsContent value="painel"><div className="page-heading"><div><p className="eyebrow">PAINEL DE MONITORAMENTO</p><h1>Visão geral da operação</h1><p>Acompanhe as entregas de alimentos perecíveis para a alimentação escolar.</p></div><button className="button-main" onClick={() => openReading()}><ScanLine size={18}/> Nova leitura</button></div>
-            <TrackingJourney/>
             {loading ? <div className="loading">Carregando cargas...</div> : shipments.length === 0 ? <div className="empty-state"><div className="empty-icon"><Radio size={30}/></div><h2>Pronto para monitorar a primeira carga</h2><p>Cadastre uma etiqueta ou carregue o percurso simulado para conhecer o painel.</p><div className="empty-actions"><NewLoadDialog open={dialogOpen} setOpen={handleLoadDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy} createdLoadId={createdLoadId} error={error} onBeginReading={() => { setDialogOpen(false); openReading(); }}/><button className="button-outline" onClick={loadDemo} disabled={busy}>Carregar demonstração</button></div></div> : <>
               {selected && <ShipmentSpotlight shipment={selected} onOpen={() => setTab("cargas")}/>}
               <div className="metrics"><Metric icon={<Package size={20}/>} label="Cargas cadastradas" value={shipments.length} detail={`${active} em andamento`}/><Metric icon={<ScanLine size={20}/>} label="Leituras registradas" value={readings} detail="Em todas as etapas"/><Metric icon={<CircleAlert size={20}/>} label="Cargas com alerta" value={alerts} detail="Indicador ativado" warn/></div>
-              <div className="dashboard-grid"><section className="panel map-panel"><div className="panel-header"><div><p className="eyebrow">INTELIGÊNCIA TERRITORIAL</p><h2>Trajeto da carga</h2></div><select aria-label="Selecionar carga no mapa" value={selected?.id || ""} onChange={e => setSelectedId(e.target.value)}>{shipments.map(s => <option value={s.id} key={s.id}>{s.id}{s.demo ? " · demo" : ""}</option>)}</select></div><RouteMap shipment={selected}/><p className="map-caption">Pontos com GPS ou centro aproximado da cidade informada. A linha não representa o caminho percorrido.</p></section>
+              <div className="dashboard-grid"><section className="panel map-panel"><div className="panel-header"><div><p className="eyebrow">INTELIGÊNCIA TERRITORIAL</p><h2>Trajeto da carga</h2></div><select aria-label="Selecionar carga no mapa" value={selected?.id || ""} onChange={e => setSelectedId(e.target.value)}>{shipments.map(s => <option value={s.id} key={s.id}>{s.id}{s.demo ? " · demo" : ""}</option>)}</select></div><RouteMap shipment={selected}/><p className="map-caption">Caminhão ilustrativo: reproduz a sequência dos check-ins, sem localização em tempo real. Pontos por GPS ou centro aproximado da cidade; a linha não representa a estrada percorrida.</p></section>
                 <section className="panel feed-panel"><div className="panel-header"><div><p className="eyebrow">ATIVIDADE RECENTE</p><h2>Últimas leituras</h2></div><span className="panel-count">{feed.length}</span></div><div className="feed-list">{feed.length ? feed.map(event => <button key={event.id} className="feed-item" onClick={() => { setSelectedId(event.loadId); setTab("cargas"); }}><span className={`feed-icon ${event.status === "alert" ? "alert" : ""}`}>{event.status === "alert" ? <CircleAlert size={18}/> : <Check size={18}/>}</span><span className="feed-copy"><strong>{event.status === "alert" ? "Alerta em " : "Leitura em "}{event.place}</strong><small>{event.loadId} · {event.stage}{event.demoLoad ? " · demo" : ""}</small></span><time>{timeOnly(event.recordedAt)}</time></button>) : <p className="muted-inset">Ainda não há leituras registradas.</p>}</div></section></div>
               <section className="panel loads-panel"><div className="panel-header"><div><p className="eyebrow">OPERAÇÃO</p><h2>Cargas monitoradas</h2></div><NewLoadDialog open={dialogOpen} setOpen={handleLoadDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy} createdLoadId={createdLoadId} error={error} onBeginReading={() => { setDialogOpen(false); openReading(); }}/></div><div className="load-table-wrap"><table className="load-table"><thead><tr><th>CARGA</th><th>ROTA</th><th>ÚLTIMA LEITURA</th><th>CONDIÇÃO</th><th></th></tr></thead><tbody>{shipments.map(s => <tr key={s.id} onClick={() => { setSelectedId(s.id); setTab("cargas"); }}><td><strong>{s.id}</strong>{s.demo ? <small className="table-demo">DEMO</small> : null}<small>{s.product}</small></td><td>{s.origin} <ArrowRight size={13} className="inline-arrow"/> {s.destination}</td><td>{latest(s) ? dateTime(latest(s)!.recordedAt) : "Aguardando"}</td><td><Status alert={isAlert(s)} delivered={isDelivered(s)}/></td><td><ChevronRight size={17}/></td></tr>)}</tbody></table></div></section>
             </>}
