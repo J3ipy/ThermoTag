@@ -72,6 +72,15 @@ function Passport({ shipment, tagLink, onWriteTag, onCopyLink, tagWriteStatus }:
 type NDEFRecordLike = { recordType: string; data: DataView; encoding?: string };
 type NDEFReaderLike = { scan: (options?: { signal?: AbortSignal }) => Promise<void>; write: (message: {records: {recordType: "url"; data: string}[]}) => Promise<void>; onreading: ((event: { serialNumber: string; message: { records: NDEFRecordLike[] } }) => void) | null; onreadingerror: (() => void) | null };
 
+function TrackingJourney() {
+  return <section className="tracking-journey" aria-labelledby="tracking-journey-title">
+    <div className="tracking-journey-header"><div><p className="eyebrow">COMO FUNCIONA</p><h2 id="tracking-journey-title">Da origem ao destino</h2><p>Cada check-in registra uma etapa e atualiza o passaporte digital da carga.</p></div><span className="tracking-demo-label">Ilustração do fluxo</span></div>
+    <picture><source media="(prefers-reduced-motion: reduce)" srcSet="/trajeto-caminhao.png"/><img className="tracking-journey-gif" src="/trajeto-caminhao.gif" width="800" height="190" alt="Caminhão percorre a rota da origem, passa por dois pontos de leitura e chega ao destino"/></picture>
+    <div className="tracking-journey-stages" aria-hidden="true"><span>Origem</span><span>Leitura 1</span><span>Leitura 2</span><span>Destino</span></div>
+    <p className="tracking-journey-note">Animação explicativa. O mapa e o histórico mostram pontos registrados nos check-ins; não há localização em tempo real.</p>
+  </section>;
+}
+
 function ShipmentSpotlight({ shipment, onOpen }: { shipment: Shipment; onOpen: () => void }) {
   const last = latest(shipment);
   const alert = isAlert(shipment);
@@ -288,6 +297,7 @@ export default function Home() {
         {notice && <div className="feedback success" role="status"><Check size={17}/>{notice}<button onClick={() => setNotice("")} aria-label="Fechar aviso"><X size={16}/></button></div>}
         <Tabs value={tab} onValueChange={value => value === "leitura" ? openReading() : setTab(value)}><TabsList className="mobile-tabs"><TabsTrigger value="painel">Painel</TabsTrigger><TabsTrigger value="leitura">Leitura</TabsTrigger><TabsTrigger value="cargas">Cargas</TabsTrigger><TabsTrigger value="admin">Admin</TabsTrigger></TabsList>
           <TabsContent value="painel"><div className="page-heading"><div><p className="eyebrow">PAINEL DE MONITORAMENTO</p><h1>Visão geral da operação</h1><p>Acompanhe as entregas de alimentos perecíveis para a alimentação escolar.</p></div><button className="button-main" onClick={() => openReading()}><ScanLine size={18}/> Nova leitura</button></div>
+            <TrackingJourney/>
             {loading ? <div className="loading">Carregando cargas...</div> : shipments.length === 0 ? <div className="empty-state"><div className="empty-icon"><Radio size={30}/></div><h2>Pronto para monitorar a primeira carga</h2><p>Cadastre uma etiqueta ou carregue o percurso simulado para conhecer o painel.</p><div className="empty-actions"><NewLoadDialog open={dialogOpen} setOpen={handleLoadDialogOpen} value={newLoad} setValue={setNewLoad} onSubmit={createLoad} busy={busy} createdLoadId={createdLoadId} error={error} onBeginReading={() => { setDialogOpen(false); openReading(); }}/><button className="button-outline" onClick={loadDemo} disabled={busy}>Carregar demonstração</button></div></div> : <>
               {selected && <ShipmentSpotlight shipment={selected} onOpen={() => setTab("cargas")}/>}
               <div className="metrics"><Metric icon={<Package size={20}/>} label="Cargas cadastradas" value={shipments.length} detail={`${active} em andamento`}/><Metric icon={<ScanLine size={20}/>} label="Leituras registradas" value={readings} detail="Em todas as etapas"/><Metric icon={<CircleAlert size={20}/>} label="Cargas com alerta" value={alerts} detail="Indicador ativado" warn/></div>
