@@ -263,3 +263,7 @@ body { background:radial-gradient(ellipse at 80% 2%,#174483 0,transparent 44%),l
   .tracking-journey picture { margin-top:12px; }
   .tracking-journey-stages { font-size:10px; }
 }
+
+.map-legend .legend-dot { background:#72e9f7; }
+.map-legend .legend-dot.red { background:#ff3434; }
+@media(prefers-reduced-motion:reduce) { .route-truck-motion { display:none; } }
