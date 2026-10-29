@@ -8,7 +8,7 @@ export async function POST() {
     if (existing) return Response.json({ id: "SE-02931", alreadyLoaded: true });
     const now = Date.now();
     const loads = [
-      { id: "SE-02931", tag: "TT-SE-02931", product: "Alimentos refrigerados", origin: "Estância", destination: "Aracaju", threshold: 8, points: [
+      { id: "SE-02931", tag: "TT-SE-02931", product: "Alimentos refrigerados", origin: "Estância", destination: "Aracaju", threshold: 5, points: [
         ["Expedição", "Estância", "normal", 190], ["Checkpoint", "Itaporanga d'Ajuda", "normal", 130], ["Checkpoint", "São Cristóvão", "alert", 65], ["Recebimento", "Aracaju", "alert", 20],
       ] },
       { id: "SE-02932", tag: "TT-SE-02932", product: "Produtos lácteos", origin: "Lagarto", destination: "Aracaju", threshold: 5, points: [

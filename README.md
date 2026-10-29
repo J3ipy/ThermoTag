@@ -102,3 +102,18 @@ A importação do SQL remoto é feita **somente na primeira publicação desse b
 | `vite.config.ts` | Configuração do Worker e do vínculo D1 |
 
 Projeto desenvolvido como MVP do **Inovathon SE**.
+
+
+## Limiares térmicos de referência do piloto
+
+- **Refrigerados:** faixa de referência de 0 a 5 °C; limiar superior sugerido de 5 °C.
+- **Congelados:** referência de −18 °C ou menos; limiar superior sugerido de −18 °C.
+- **Personalizado:** informar o valor aplicável ao lote conforme rótulo, contrato e responsável técnico.
+
+Esses perfis são referências operacionais, não limites legais universais de transporte ou aceitação. Valores acima do limite exigem investigação; não determinam descarte automaticamente. A referência de conservação vem da [Nota Técnica 012/2023 da FUNDEPAR](https://www.fundepar.pr.gov.br/sites/fundepar/arquivos_restritos/files/documento/2024-10/nota_tecnica_012_-_2023_-_orientacao_sobre_conservacao_de_congelados.pdf). A condição específica do alimento deve prevalecer.
+
+O campo armazena o limiar nominal do indicador físico compatível com o lote. Selecionar um perfil não altera as propriedades da tinta. Antes do uso operacional, confirmar o limiar, a tolerância e o tempo de resposta na ficha do fabricante e validar o indicador. Um indicador de limite superior não detecta temperaturas abaixo do mínimo da faixa refrigerada.
+
+O MVP não mede temperatura: ele registra a inspeção e classifica a cor da foto. Indicador íntegro não garante conformidade térmica. Indicador ativado gera alerta vermelho, que permanece no histórico; análise inconclusiva exige revisão e justificativa. Não são inferidos graus Celsius, duração da exposição ou níveis de gravidade a partir da intensidade do vermelho.
+
+Novas cargas iniciam com 5 °C, substituindo o antigo exemplo de 8 °C. Cargas já cadastradas mantêm seus limiares históricos. Não há migração de banco nesta alteração.
